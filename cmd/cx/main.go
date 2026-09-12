@@ -87,8 +87,8 @@ func tokenFor(provider string, p cx.Provider) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if token == "" {
-		return "", fmt.Errorf("the stored %s token is empty, run: cx token set", provider)
+	if err := cx.CheckToken(p, token); err != nil {
+		return "", fmt.Errorf("the stored %s token is unusable: %w, run: cx token set", provider, err)
 	}
 	return token, nil
 }
@@ -124,7 +124,7 @@ func printStatus(cfg cx.Config, provider, configPath string) error {
 		p := cfg.Providers[name]
 		fmt.Fprintf(out, "\ngateway\t%s\n", name)
 		fmt.Fprintf(out, "  base url\t%s\n", p.BaseURL)
-		fmt.Fprintf(out, "  token\t%s (%s)\n", tokenState(p.KeychainService), cx.TokenLocation(p.KeychainService))
+		fmt.Fprintf(out, "  token\t%s (%s)\n", tokenState(p), cx.TokenLocation(p.KeychainService))
 		fmt.Fprintf(out, "  opus\t%s\n", p.Models.Opus)
 		fmt.Fprintf(out, "  sonnet\t%s\n", p.Models.Sonnet)
 		fmt.Fprintf(out, "  haiku\t%s\n", p.Models.Haiku)
@@ -133,16 +133,16 @@ func printStatus(cfg cx.Config, provider, configPath string) error {
 	return out.Flush()
 }
 
-func tokenState(service string) string {
-	switch token, err := cx.LoadToken(service); {
+func tokenState(p cx.Provider) string {
+	switch token, err := cx.LoadToken(p.KeychainService); {
 	case errors.Is(err, cx.ErrNoToken):
 		return "missing"
 	case err != nil:
 		return "unreadable"
-	case token == "":
-		return "empty"
+	case cx.CheckToken(p, token) != nil:
+		return "present but not a valid " + p.KeychainService + " key"
 	default:
-		return "present"
+		return "present, " + cx.MaskToken(token)
 	}
 }
 
@@ -162,17 +162,24 @@ func runToken(cfg cx.Config, provider string, args []string) error {
 		return err
 	}
 
-	token, err := readSecret(fmt.Sprintf("%s token: ", provider))
+	token, err := readSecret(promptFor(provider, p))
 	if err != nil {
 		return err
 	}
-	if token == "" {
-		return errors.New("no token given, nothing stored")
+	if err := cx.CheckToken(p, token); err != nil {
+		return fmt.Errorf("%w, nothing was stored", err)
 	}
 
 	if err := cx.StoreToken(p.KeychainService, os.Getenv("USER"), token); err != nil {
 		return err
 	}
-	fmt.Printf("stored in %s\n", cx.TokenLocation(p.KeychainService))
+	fmt.Printf("stored %s in %s\n", cx.MaskToken(token), cx.TokenLocation(p.KeychainService))
 	return nil
+}
+
+func promptFor(provider string, p cx.Provider) string {
+	if p.TokenPrefix == "" {
+		return fmt.Sprintf("Paste your %s API key: ", provider)
+	}
+	return fmt.Sprintf("Paste your %s API key (%s...): ", provider, p.TokenPrefix)
 }

@@ -23,7 +23,10 @@ type Models struct {
 type Provider struct {
 	BaseURL         string `json:"baseUrl"`
 	KeychainService string `json:"keychainService"`
-	Models          Models `json:"models"`
+	// TokenPrefix, when set, is what this provider's keys start with. cx checks
+	// it so that a mistyped credential fails at the prompt rather than as a 401.
+	TokenPrefix string `json:"tokenPrefix"`
+	Models      Models `json:"models"`
 }
 
 type Config struct {
@@ -38,11 +41,12 @@ func DefaultConfig() Config {
 			ProviderAkashML: {
 				BaseURL:         "https://api.akashml.com/anthropic",
 				KeychainService: ProviderAkashML,
+				TokenPrefix:     "akml-",
 				Models: Models{
-					Opus:      "zai-org/GLM-5.3",
-					Sonnet:    "zai-org/GLM-5.3",
-					Haiku:     "zai-org/GLM-5.3",
-					SmallFast: "zai-org/GLM-5.3",
+					Opus:      "zai-org--GLM-5.3",
+					Sonnet:    "zai-org--GLM-5.3",
+					Haiku:     "zai-org--GLM-5.3",
+					SmallFast: "zai-org--GLM-5.3",
 				},
 			},
 		},
@@ -87,6 +91,9 @@ func mergeProvider(base, over Provider) Provider {
 	}
 	if over.KeychainService != "" {
 		base.KeychainService = over.KeychainService
+	}
+	if over.TokenPrefix != "" {
+		base.TokenPrefix = over.TokenPrefix
 	}
 	if over.Models.Opus != "" {
 		base.Models.Opus = over.Models.Opus

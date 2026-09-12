@@ -46,10 +46,10 @@ claude    /Users/you/.local/bin/claude
 gateway       akashml
   base url    https://api.akashml.com/anthropic
   token       present (macOS keychain, service "akashml")
-  opus        zai-org/GLM-5.3
-  sonnet      zai-org/GLM-5.3
-  haiku       zai-org/GLM-5.3
-  small/fast  zai-org/GLM-5.3
+  opus        zai-org--GLM-5.3
+  sonnet      zai-org--GLM-5.3
+  haiku       zai-org--GLM-5.3
+  small/fast  zai-org--GLM-5.3
 ```
 
 ## Usage
@@ -79,19 +79,27 @@ Since `cx` replaces itself with `claude` rather than wrapping it, exit codes, si
       "baseUrl": "https://api.akashml.com/anthropic",
       "keychainService": "akashml",
       "models": {
-        "opus": "zai-org/GLM-5.3",
-        "sonnet": "zai-org/GLM-5.3",
-        "haiku": "zai-org/GLM-5.3",
-        "smallFast": "zai-org/GLM-5.3"
+        "opus": "zai-org--GLM-5.3",
+        "sonnet": "zai-org--GLM-5.3",
+        "haiku": "zai-org--GLM-5.3",
+        "smallFast": "zai-org--GLM-5.3"
       }
     }
   }
 }
 ```
 
-`smallFast` is worth setting separately. Claude Code uses that tier for frequent background work, so a cheaper model there is rarely something you notice.
+Model ids use `--` between the org and the model, not `/`. Ask the endpoint for the current list rather than guessing:
+
+```sh
+curl -s https://api.akashml.com/anthropic/v1/models | python3 -m json.tool
+```
+
+`smallFast` is worth setting separately. Claude Code uses that tier for frequent background work, so a cheaper model there, `openai--gpt-oss-20b` for instance, is rarely something you notice.
 
 Set `"defaultProvider": "akashml"` if you would rather have a bare `cx` go to AkashML and keep `cx --anthropic` for the times you want your subscription.
+
+`tokenPrefix` is what that provider's keys begin with. `cx` checks it when you store a key and again before launching, so a mistyped credential fails at the prompt with a readable message instead of reaching you as a 401 from the gateway.
 
 Any gateway that speaks the Anthropic API works. Add it under `providers` with its own `keychainService`, then run `cx --provider=NAME token set`.
 
@@ -99,7 +107,7 @@ Any gateway that speaks the Anthropic API works. Add it under `providers` with i
 
 On the Anthropic path, `cx` clears the variables a gateway session would have set and launches. Your saved `claude` login is used exactly as it would be normally.
 
-On a gateway path, it clears the same set and then exports the base URL, your token as `ANTHROPIC_AUTH_TOKEN`, all four model tiers, and `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1`, which keeps Claude Code from sending pre-release features a third-party endpoint won't implement. It also clears `CLAUDE_CODE_USE_BEDROCK` and friends, because those outrank the auth token in [Claude Code's precedence order](https://code.claude.com/docs/en/authentication#authentication-precedence) and would route you somewhere you didn't ask for.
+On a gateway path, it clears the same set and then exports the base URL, your token as `ANTHROPIC_AUTH_TOKEN`, all four model tiers, and two flags. `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1` keeps Claude Code from sending pre-release features a third-party endpoint won't implement. `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` matters more than it looks: if your saved model selection is a 1M-context variant, Claude Code carries that choice into the gateway session and asks for `<model>[1m]`, an id no gateway serves, and you get `unrecognized_model` before a single request goes out. It also clears `CLAUDE_CODE_USE_BEDROCK` and friends, because those outrank the auth token in [Claude Code's precedence order](https://code.claude.com/docs/en/authentication#authentication-precedence) and would route you somewhere you didn't ask for.
 
 One thing to avoid: don't put `ANTHROPIC_*` variables in the `env` block of `~/.claude/settings.json`. Values there override the environment a process is launched with, which would pin every session to one provider and defeat the tool.
 

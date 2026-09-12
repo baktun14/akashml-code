@@ -125,3 +125,21 @@ func envMap(env []string) map[string]string {
 	}
 	return out
 }
+
+func TestBuildEnvOnGatewayDisablesTheLongContextVariant(t *testing.T) {
+	got := envMap(BuildEnv(nil, ProviderAkashML, testProvider(), "secret-token"))
+
+	// A saved 1M selection otherwise makes Claude Code request "<model>[1m]",
+	// which no gateway model id carries.
+	if got["CLAUDE_CODE_DISABLE_1M_CONTEXT"] != "1" {
+		t.Error("CLAUDE_CODE_DISABLE_1M_CONTEXT was not set, so a 1M model selection would be sent as an unknown model id")
+	}
+}
+
+func TestBuildEnvOnAnthropicLeavesTheLongContextVariantAlone(t *testing.T) {
+	got := envMap(BuildEnv(nil, ProviderAnthropic, Provider{}, ""))
+
+	if _, ok := got["CLAUDE_CODE_DISABLE_1M_CONTEXT"]; ok {
+		t.Error("CLAUDE_CODE_DISABLE_1M_CONTEXT was set on the Anthropic path, where 1M context is wanted")
+	}
+}

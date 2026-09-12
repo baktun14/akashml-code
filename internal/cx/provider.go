@@ -20,6 +20,7 @@ var managedVars = []string{
 	"ANTHROPIC_DEFAULT_HAIKU_MODEL",
 	"ANTHROPIC_SMALL_FAST_MODEL",
 	"CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS",
+	"CLAUDE_CODE_DISABLE_1M_CONTEXT",
 	"CX_PROVIDER",
 }
 
@@ -63,6 +64,9 @@ func gatewayVars(p Provider, token string) map[string]string {
 		"ANTHROPIC_DEFAULT_HAIKU_MODEL":          p.Models.Haiku,
 		"ANTHROPIC_SMALL_FAST_MODEL":             p.Models.SmallFast,
 		"CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS": "1",
+		// A saved 1M-context model selection carries into a gateway session and
+		// makes Claude Code ask for "<model>[1m]", which no gateway model id is.
+		"CLAUDE_CODE_DISABLE_1M_CONTEXT": "1",
 	}
 }
 
