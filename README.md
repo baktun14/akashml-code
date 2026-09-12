@@ -122,6 +122,26 @@ $ cx --akash models use 5            # point every tier at GPT OSS 120B
 $ cx --akash models use 1 haiku fast # or just the cheap tiers
 ```
 
+### Images
+
+Pasting an image into a session is worth thinking about before you do it, because not every model takes one and the failure is unrecoverable in place. An image stays in the conversation, so every later turn resends it. Once a text-only model has rejected one, every following message fails the same way no matter what you type, including a message asking it to ignore the image.
+
+| Model | Image in the request |
+|---|---|
+| `Qwen--Qwen3.8-27B` | reads it |
+| `Qwen--Qwen3.6-35B-A3B` | reads it |
+| `openai--gpt-oss-120b` | accepted, then ignored (empty reply) |
+| `openai--gpt-oss-20b` | accepted, then ignored (empty reply) |
+| `zai-org--GLM-5.3` | **400, and the session cannot continue** |
+| `meta-llama--Llama-3.3-70B-Instruct` | **400, and the session cannot continue** |
+
+If you are already stuck, you do not have to abandon the conversation. Switch to a model that accepts images and resume:
+
+```sh
+cx --akash models use Qwen--Qwen3.8-27B
+cx --akash --continue
+```
+
 Take a number from the listing or paste an id. The last column shows which tiers each model currently backs. Since the list comes from the provider's own `/v1/models`, the ids offered are always ones it will accept.
 
 `smallFast` is worth setting separately. Claude Code uses that tier for frequent background work, so a cheaper model there, `openai--gpt-oss-20b` for instance, is rarely something you notice.
