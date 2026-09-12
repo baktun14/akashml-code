@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"syscall"
 )
 
 const securityBin = "/usr/bin/security"
@@ -27,14 +28,24 @@ func LoadToken(service string) (string, error) {
 	return strings.TrimSuffix(string(out), "\n"), nil
 }
 
-func storeToken(service, account, token string) error {
+// securityStoreCommand builds the write without ever placing the secret in
+// argv, where any other process on the machine could read it out of the process
+// table.
+func securityStoreCommand(service, account, token string) *exec.Cmd {
 	cmd := exec.Command(securityBin, "add-generic-password", "-U", "-s", service, "-a", account, "-w")
-	// security prompts for the secret and then for a confirmation. Feeding both
-	// on stdin keeps the token out of the process table, where passing it as an
-	// argument would leave it readable by any other process on the machine.
-	cmd.Stdin = strings.NewReader(token + "\n" + token + "\n")
 
-	if out, err := cmd.CombinedOutput(); err != nil {
+	// Given a controlling terminal, security reads the secret from /dev/tty and
+	// ignores stdin, storing whatever the terminal hands it rather than the value
+	// below. Detaching the child leaves it no tty to open.
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+
+	// security asks for the secret and then for a confirmation.
+	cmd.Stdin = strings.NewReader(token + "\n" + token + "\n")
+	return cmd
+}
+
+func storeToken(service, account, token string) error {
+	if out, err := securityStoreCommand(service, account, token).CombinedOutput(); err != nil {
 		return fmt.Errorf("storing %q in the keychain: %w: %s", service, err, strings.TrimSpace(string(out)))
 	}
 	return nil
