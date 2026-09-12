@@ -1,1 +1,13 @@
+# built binary
 /cx
+
+# nothing here should ever hold a credential: cx keeps tokens in the OS
+# keychain and its config under ~/.config/cx. These patterns exist so that a
+# stray local file cannot be committed by accident.
+.env
+.env.*
+*.token
+*.pem
+*.key
+capabilities.json
+config.json
