@@ -14,7 +14,7 @@ func TestFetchModelsReadsTheProvidersOwnList(t *testing.T) {
 	}))
 	defer server.Close()
 
-	models, err := FetchModels(Provider{BaseURL: server.URL}, "akml-token")
+	models, err := FetchModels(Provider{BaseURL: server.URL}, "akml-EXAMPLE-token")
 	if err != nil {
 		t.Fatalf("FetchModels returned %v", err)
 	}
@@ -22,7 +22,7 @@ func TestFetchModelsReadsTheProvidersOwnList(t *testing.T) {
 	if gotPath != "/v1/models" {
 		t.Errorf("asked for %q, want /v1/models", gotPath)
 	}
-	if gotAuth != "Bearer akml-token" {
+	if gotAuth != "Bearer akml-EXAMPLE-token" {
 		t.Errorf("Authorization = %q, a gateway that gates its model list would refuse", gotAuth)
 	}
 	if len(models) != 2 || models[0].ID != "a--one" {
@@ -140,7 +140,7 @@ func TestEnrichmentMatchesAcrossTheTwoIdSpellings(t *testing.T) {
 	}))
 	defer list.Close()
 
-	models, err := FetchModels(Provider{BaseURL: list.URL, CatalogueURL: catalogue.URL}, "akml-token")
+	models, err := FetchModels(Provider{BaseURL: list.URL, CatalogueURL: catalogue.URL}, "akml-EXAMPLE-token")
 	if err != nil {
 		t.Fatalf("FetchModels returned %v", err)
 	}

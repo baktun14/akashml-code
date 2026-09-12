@@ -48,7 +48,7 @@ func TestProbeVisionClassifiesWhatAModelDoesWithAnImage(t *testing.T) {
 			server := httptest.NewServer(tt.handler)
 			defer server.Close()
 
-			got, err := ProbeVision(Provider{BaseURL: server.URL}, "akml-token", "some-model")
+			got, err := ProbeVision(Provider{BaseURL: server.URL}, "akml-EXAMPLE-token", "some-model")
 			if err != nil {
 				t.Fatalf("ProbeVision returned %v", err)
 			}

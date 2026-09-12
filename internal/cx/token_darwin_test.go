@@ -8,7 +8,7 @@ import (
 )
 
 func TestSecurityStoreCommandKeepsTheSecretOutOfArgv(t *testing.T) {
-	const secret = "akml-do-not-put-me-in-the-process-table"
+	const secret = "akml-EXAMPLE-do-not-put-me-in-the-process-table"
 
 	cmd := securityStoreCommand("svc", "acct", secret)
 
@@ -20,7 +20,7 @@ func TestSecurityStoreCommandKeepsTheSecretOutOfArgv(t *testing.T) {
 }
 
 func TestSecurityStoreCommandDetachesFromTheControllingTerminal(t *testing.T) {
-	cmd := securityStoreCommand("svc", "acct", "akml-token")
+	cmd := securityStoreCommand("svc", "acct", "akml-EXAMPLE-token")
 
 	if cmd.SysProcAttr == nil || !cmd.SysProcAttr.Setsid {
 		t.Fatal("without Setsid, security reads the secret from /dev/tty and stores the terminal's keystrokes instead of the token")

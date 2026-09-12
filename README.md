@@ -181,6 +181,19 @@ Resuming a conversation across providers works, but Claude Code has no documente
 
 Keychain storage is macOS only. On other platforms the token goes to a `0600` file next to the config instead.
 
+## Credential scanning
+
+CI runs [secretlint](https://secretlint.github.io/) over every file, with the recommended preset plus patterns for the two key formats this project touches:
+
+```json
+{"name": "AkashML API key",               "patterns": ["/akml-[A-Za-z0-9_-]{10,}/"]}
+{"name": "Anthropic API key or OAuth token", "patterns": ["/sk-ant-[A-Za-z0-9_-]{10,}/"]}
+```
+
+Run it yourself with `npx --yes -p secretlint -p @secretlint/secretlint-rule-preset-recommend -p @secretlint/secretlint-rule-pattern secretlint "**/*"`.
+
+Test fixtures that look like keys must contain `EXAMPLE`, `SENTINEL`, `PLACEHOLDER` or `not-a-real-key`, which is what the allowlist keys on. That constraint is the point rather than a nuisance: a fixture built by editing a real value is how a real one gets committed.
+
 ## License
 
 MIT

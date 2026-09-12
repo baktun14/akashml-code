@@ -16,7 +16,7 @@ func TestCheckToken(t *testing.T) {
 	}{
 		{name: "a real key passes", p: akashml, token: "akml-EXAMPLEEXAMPLE01", wantErr: false},
 		{name: "a password typed at the prompt is rejected", p: akashml, token: "hunter2-not-a-key!", wantErr: true},
-		{name: "an Anthropic key pasted by mistake is rejected", p: akashml, token: "sk-ant-api03-xxxx", wantErr: true},
+		{name: "an Anthropic key pasted by mistake is rejected", p: akashml, token: "sk-ant-api03-not-a-real-key", wantErr: true},
 		{name: "an empty token is rejected", p: akashml, token: "", wantErr: true},
 		{name: "a provider with no declared prefix accepts anything non-empty", p: Provider{}, token: "whatever", wantErr: false},
 		{name: "a provider with no declared prefix still rejects empty", p: Provider{}, token: "", wantErr: true},
