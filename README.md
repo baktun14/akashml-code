@@ -107,7 +107,9 @@ Trust that list over any documentation, including AkashML's own guide, which cur
 
 ### A note on GLM-5.3
 
-Avoid it here for now, which is why it is not the default. AkashML's Anthropic endpoint returns GLM's raw output without parsing its reasoning delimiters, so a literal `</think>` and the whole chain of thought land in the visible answer. GLM also tends to run away with itself afterwards, repeating "Done. Final. Complete." for minutes on end, which is where the long response times come from. Nothing on the client fixes it: `thinking: {"type": "disabled"}`, `chat_template_kwargs.enable_thinking`, and a `/nothink` system prompt all still leak.
+Avoid it here for now, which is why it is not the default. AkashML's Anthropic endpoint returns GLM's raw output without parsing its reasoning delimiters, so a literal `</think>` and the whole chain of thought land in the visible answer. GLM also tends to run away with itself afterwards, repeating "Done. Final. Complete." for minutes on end, which is where the long response times come from. The gateway clearly knows how to separate the reasoning, because two other paths do it correctly: its OpenAI endpoint returns a clean `content` alongside a separate `reasoning_content` with no special request, and its Anthropic endpoint returns proper `thinking` and `text` blocks when a request explicitly enables thinking. It only leaks on the Anthropic endpoint when the client does not ask for thinking, which is the default case.
+
+That leaves no workaround worth using. Turning thinking off does not help (`thinking: {"type": "disabled"}`, `chat_template_kwargs.enable_thinking: false` and a `/nothink` system prompt all still leak), and turning it on via `MAX_THINKING_TOKENS` only works for trivial requests: give GLM Claude Code's real system prompt and tool definitions and it leaks its reasoning again, this time along with tool-call scaffolding such as `</arg_value>` in the visible answer.
 
 Every other model AkashML serves is clean. All five return plain text and emit correct tool calls with `stop_reason: tool_use`, which is what Claude Code needs:
 
