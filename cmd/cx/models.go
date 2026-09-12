@@ -51,8 +51,8 @@ func listModels(models []cx.Model, provider string, p cx.Provider) error {
 	for i, m := range models {
 		vision := caps.VisionFor(provider, m.ID)
 		probed = probed || vision != cx.VisionUnknown
-		fmt.Fprintf(out, "%d\t%s\t%s\t%s\t%s\n",
-			i+1, m.ID, m.Name(), strings.Join(p.Models.TiersUsing(m.ID), ", "), vision.Describe())
+		fmt.Fprintf(out, "%d\t%s\t%s\t%s\t%s\t%s\n",
+			i+1, m.ID, m.Name(), describeContext(m), strings.Join(p.Models.TiersUsing(m.ID), ", "), vision.Describe())
 	}
 	if err := out.Flush(); err != nil {
 		return err
@@ -113,6 +113,18 @@ func probeModels(models []cx.Model, provider string, p cx.Provider, token string
 	return nil
 }
 
+// describeContext renders a window in the units people quote them in.
+func describeContext(m cx.Model) string {
+	switch {
+	case m.ContextLength == 0:
+		return ""
+	case m.ContextLength >= 1<<20:
+		return fmt.Sprintf("%gM ctx", float64(m.ContextLength)/(1<<20))
+	default:
+		return fmt.Sprintf("%gk ctx", float64(m.ContextLength)/(1<<10))
+	}
+}
+
 func loadCapabilities() cx.Capabilities {
 	path, err := cx.CapabilitiesPath()
 	if err != nil {
@@ -147,6 +159,7 @@ func useModel(cfg cx.Config, provider, configPath string, models []cx.Model, arg
 	for _, tier := range tiers {
 		p.Models.Set(tier, chosen.ID)
 	}
+	p.MaxContextTokens = cx.ConversationWindow(p.Models, models)
 	cfg.Providers[provider] = p
 
 	if err := cx.Save(configPath, cfg); err != nil {
@@ -162,6 +175,9 @@ func useModel(cfg cx.Config, provider, configPath string, models []cx.Model, arg
 	fmt.Printf("%s now backs %s\n", chosen.ID, strings.Join(tiers, ", "))
 	for _, tier := range cx.Tiers {
 		fmt.Printf("  %-10s %s\n", tier, p.Models.Get(tier))
+	}
+	if p.MaxContextTokens > 0 {
+		fmt.Printf("  %-10s %d tokens\n", "context", p.MaxContextTokens)
 	}
 	return nil
 }

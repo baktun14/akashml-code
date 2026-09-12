@@ -22,6 +22,7 @@ var managedVars = []string{
 	"ANTHROPIC_DEFAULT_HAIKU_MODEL",
 	"ANTHROPIC_SMALL_FAST_MODEL",
 	"API_TIMEOUT_MS",
+	"CLAUDE_CODE_MAX_CONTEXT_TOKENS",
 	"CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS",
 	"CLAUDE_CODE_DISABLE_1M_CONTEXT",
 	"CX_PROVIDER",
@@ -73,6 +74,9 @@ func gatewayVars(p Provider, token string) map[string]string {
 	}
 	if p.APITimeoutMS > 0 {
 		vars["API_TIMEOUT_MS"] = strconv.Itoa(p.APITimeoutMS)
+	}
+	if p.MaxContextTokens > 0 {
+		vars["CLAUDE_CODE_MAX_CONTEXT_TOKENS"] = strconv.Itoa(p.MaxContextTokens)
 	}
 	return vars
 }

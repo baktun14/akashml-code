@@ -11,6 +11,20 @@ import (
 type Model struct {
 	ID          string `json:"id"`
 	DisplayName string `json:"display_name"`
+
+	// Filled in from the provider's catalogue when it publishes one. The
+	// Anthropic-shaped model list carries none of this.
+	ContextLength   int
+	InputModalities []string
+}
+
+func (m Model) TakesImages() bool {
+	for _, kind := range m.InputModalities {
+		if kind == "image" {
+			return true
+		}
+	}
+	return false
 }
 
 func (m Model) Name() string {
@@ -53,7 +67,67 @@ func FetchModels(p Provider, token string) ([]Model, error) {
 	if len(body.Data) == 0 {
 		return nil, fmt.Errorf("%s returned no models", url)
 	}
+
+	enrichFromCatalogue(body.Data, p, token)
 	return body.Data, nil
+}
+
+// catalogueEntry is the OpenAI-shaped model record, which carries the context
+// window and modalities that the Anthropic-shaped list leaves out.
+type catalogueEntry struct {
+	ID              string   `json:"id"`
+	ContextLength   int      `json:"context_length"`
+	InputModalities []string `json:"input_modalities"`
+}
+
+// enrichFromCatalogue fills in what the provider's richer listing knows. It is
+// best effort: a provider that publishes no catalogue simply leaves the extra
+// fields empty rather than failing the listing.
+func enrichFromCatalogue(models []Model, p Provider, token string) {
+	if p.CatalogueURL == "" {
+		return
+	}
+
+	req, err := http.NewRequest(http.MethodGet, p.CatalogueURL, nil)
+	if err != nil {
+		return
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := (&http.Client{Timeout: 15 * time.Second}).Do(req)
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return
+	}
+
+	var body struct {
+		Data []catalogueEntry `json:"data"`
+	}
+	if json.NewDecoder(resp.Body).Decode(&body) != nil {
+		return
+	}
+
+	// The two listings spell the same model differently, so match on a form that
+	// ignores the separator rather than on the raw id.
+	byKey := make(map[string]catalogueEntry, len(body.Data))
+	for _, entry := range body.Data {
+		byKey[modelKey(entry.ID)] = entry
+	}
+	for i := range models {
+		if entry, ok := byKey[modelKey(models[i].ID)]; ok {
+			models[i].ContextLength = entry.ContextLength
+			models[i].InputModalities = entry.InputModalities
+		}
+	}
+}
+
+func modelKey(id string) string {
+	return strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(id, "--", "/"), "_", "-"))
 }
 
 // Tiers are the model slots Claude Code resolves, in the order cx displays them.
@@ -111,4 +185,26 @@ func (m Models) TiersUsing(model string) []string {
 		}
 	}
 	return used
+}
+
+// ConversationWindow is the smallest window among the models that carry the
+// conversation. Claude Code works to one number for a session, so it has to be
+// one every model that might answer can actually accept.
+func ConversationWindow(configured Models, models []Model) int {
+	lengths := make(map[string]int, len(models))
+	for _, m := range models {
+		lengths[m.ID] = m.ContextLength
+	}
+
+	smallest := 0
+	for _, tier := range []string{"opus", "sonnet"} {
+		length := lengths[configured.Get(tier)]
+		if length == 0 {
+			continue
+		}
+		if smallest == 0 || length < smallest {
+			smallest = length
+		}
+	}
+	return smallest
 }

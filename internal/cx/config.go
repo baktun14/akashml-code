@@ -30,6 +30,13 @@ type Provider struct {
 	// assume for this provider's models. Without it, Claude Code refuses an id
 	// that is absent from its own catalog.
 	BehavesAs string `json:"behavesAs"`
+	// CatalogueURL is a richer model listing than the Anthropic-shaped one,
+	// carrying context windows and modalities.
+	CatalogueURL string `json:"catalogueUrl"`
+	// MaxContextTokens is the window Claude Code should work to. Without it the
+	// session is held to whatever BehavesAs implies, which for an open model with
+	// a long window is far short of what it can take.
+	MaxContextTokens int `json:"maxContextTokens"`
 	// APITimeoutMS raises the per-request deadline, since open models served
 	// behind a gateway are often much slower to first token than Claude is.
 	APITimeoutMS int    `json:"apiTimeoutMs"`
@@ -50,6 +57,7 @@ func DefaultConfig() Config {
 				KeychainService: ProviderAkashML,
 				TokenPrefix:     "akml-",
 				BehavesAs:       "claude-sonnet-5",
+				CatalogueURL:    "https://api.akashml.com/v1/models",
 				APITimeoutMS:    3000000,
 				Models: Models{
 					Opus:      "zai-org--GLM-5.3",
@@ -106,6 +114,12 @@ func mergeProvider(base, over Provider) Provider {
 	}
 	if over.BehavesAs != "" {
 		base.BehavesAs = over.BehavesAs
+	}
+	if over.CatalogueURL != "" {
+		base.CatalogueURL = over.CatalogueURL
+	}
+	if over.MaxContextTokens != 0 {
+		base.MaxContextTokens = over.MaxContextTokens
 	}
 	if over.APITimeoutMS != 0 {
 		base.APITimeoutMS = over.APITimeoutMS

@@ -157,6 +157,9 @@ func printStatus(cfg cx.Config, provider, configPath string) error {
 		fmt.Fprintf(out, "  sonnet\t%s\n", p.Models.Sonnet)
 		fmt.Fprintf(out, "  haiku\t%s\n", p.Models.Haiku)
 		fmt.Fprintf(out, "  small/fast\t%s\n", p.Models.SmallFast)
+		if p.MaxContextTokens > 0 {
+			fmt.Fprintf(out, "  context\t%d tokens\n", p.MaxContextTokens)
+		}
 	}
 	return out.Flush()
 }
