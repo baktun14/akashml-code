@@ -32,7 +32,13 @@ Then store your AkashML token, which you can generate at [akashml.com](https://a
 cx token set
 ```
 
-It reads the token from your terminal without echoing it and writes it to your keychain. Nothing touches your shell history, and the token is never passed as a command-line argument, so it never shows up in `ps`.
+It reads the token from your terminal without echoing it and writes it to your keychain, then reads it back to confirm the write actually took. Nothing touches your shell history, and the token is never passed as a command-line argument, so it never shows up in `ps`.
+
+If it ever reports that the store still holds a different value, delete the item and run it again:
+
+```sh
+security delete-generic-password -s akashml
+```
 
 Check where you stand at any time:
 

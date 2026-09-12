@@ -27,7 +27,7 @@ func LoadToken(service string) (string, error) {
 	return strings.TrimSuffix(string(out), "\n"), nil
 }
 
-func StoreToken(service, account, token string) error {
+func storeToken(service, account, token string) error {
 	cmd := exec.Command(securityBin, "add-generic-password", "-U", "-s", service, "-a", account, "-w")
 	// security prompts for the secret and then for a confirmation. Feeding both
 	// on stdin keeps the token out of the process table, where passing it as an

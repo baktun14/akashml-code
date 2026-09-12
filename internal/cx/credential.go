@@ -29,3 +29,24 @@ func MaskToken(token string) string {
 	}
 	return fmt.Sprintf("%s...%s (%d characters)", token[:shown], token[len(token)-shown:], len(token))
 }
+
+// StoreToken writes a credential and then reads it back before reporting
+// success. security(1) has been seen to exit 0 on an update that moved the
+// item's modification date but left the old password in place, so its exit code
+// alone is not evidence that the write took.
+func StoreToken(service, account, token string) error {
+	if err := storeToken(service, account, token); err != nil {
+		return err
+	}
+
+	stored, err := LoadToken(service)
+	if err != nil {
+		return fmt.Errorf("wrote the token but could not read it back: %w", err)
+	}
+	if stored != token {
+		return fmt.Errorf(
+			"the store reported success but %s still holds a different value; remove it and try again:\n    security delete-generic-password -s %s",
+			TokenLocation(service), service)
+	}
+	return nil
+}

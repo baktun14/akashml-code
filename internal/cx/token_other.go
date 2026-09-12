@@ -33,7 +33,7 @@ func LoadToken(service string) (string, error) {
 	return strings.TrimSpace(string(raw)), nil
 }
 
-func StoreToken(service, _, token string) error {
+func storeToken(service, _, token string) error {
 	path, err := tokenPath(service)
 	if err != nil {
 		return err
