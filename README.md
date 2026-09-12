@@ -52,10 +52,10 @@ claude    /Users/you/.local/bin/claude
 gateway       akashml
   base url    https://api.akashml.com/anthropic
   token       present (macOS keychain, service "akashml")
-  opus        zai-org--GLM-5.3
-  sonnet      zai-org--GLM-5.3
-  haiku       zai-org--GLM-5.3
-  small/fast  zai-org--GLM-5.3
+  opus        openai--gpt-oss-120b
+  sonnet      openai--gpt-oss-120b
+  haiku       openai--gpt-oss-20b
+  small/fast  openai--gpt-oss-20b
 ```
 
 ## Usage
@@ -85,10 +85,10 @@ Since `cx` replaces itself with `claude` rather than wrapping it, exit codes, si
       "baseUrl": "https://api.akashml.com/anthropic",
       "keychainService": "akashml",
       "models": {
-        "opus": "zai-org--GLM-5.3",
-        "sonnet": "zai-org--GLM-5.3",
-        "haiku": "zai-org--GLM-5.3",
-        "smallFast": "zai-org--GLM-5.3"
+        "opus": "openai--gpt-oss-120b",
+        "sonnet": "openai--gpt-oss-120b",
+        "haiku": "openai--gpt-oss-20b",
+        "smallFast": "openai--gpt-oss-20b"
       },
       "behavesAs": "claude-sonnet-5",
       "apiTimeoutMs": 3000000
@@ -105,13 +105,28 @@ curl -s https://api.akashml.com/anthropic/v1/models | python3 -m json.tool
 
 Trust that list over any documentation, including AkashML's own guide, which currently advertises at least one model the endpoint answers with a 404. The gateway accepts both the `zai-org--GLM-5.3` spelling the endpoint returns and the `zai-org/GLM-5.3` spelling the docs use.
 
+### A note on GLM-5.3
+
+Avoid it here for now, which is why it is not the default. AkashML's Anthropic endpoint returns GLM's raw output without parsing its reasoning delimiters, so a literal `</think>` and the whole chain of thought land in the visible answer. GLM also tends to run away with itself afterwards, repeating "Done. Final. Complete." for minutes on end, which is where the long response times come from. Nothing on the client fixes it: `thinking: {"type": "disabled"}`, `chat_template_kwargs.enable_thinking`, and a `/nothink` system prompt all still leak.
+
+Every other model AkashML serves is clean. All five return plain text and emit correct tool calls with `stop_reason: tool_use`, which is what Claude Code needs:
+
+| Model | Reasoning leak | Tool calls |
+|---|---|---|
+| `openai--gpt-oss-120b` | clean | yes |
+| `openai--gpt-oss-20b` | clean | yes |
+| `meta-llama--Llama-3.3-70B-Instruct` | clean | yes |
+| `Qwen--Qwen3.8-27B` | clean | yes |
+| `Qwen--Qwen3.6-35B-A3B` | clean | yes |
+| `zai-org--GLM-5.3` | **leaks `</think>`** | yes |
+
 `smallFast` is worth setting separately. Claude Code uses that tier for frequent background work, so a cheaper model there, `openai--gpt-oss-20b` for instance, is rarely something you notice.
 
 Set `"defaultProvider": "akashml"` if you would rather have a bare `cx` go to AkashML and keep `cx --anthropic` for the times you want your subscription.
 
 `behavesAs` names the Claude model whose capabilities Claude Code should assume for this provider's models, and it is not optional in practice. Claude Code refuses any model id missing from the catalog its own build shipped with, so without it a launch dies on `[claude-code:unrecognized_model]` before a single request goes out. `cx` passes it per launch via `claude --settings`, so a gateway's models never show up in the picker of a session running on Anthropic.
 
-`apiTimeoutMs` raises the per-request deadline. Open models behind a gateway can be far slower than Claude is: with Claude Code's full system prompt and tool definitions in the request, GLM-5.3 has taken several minutes to answer a one-word prompt. The default here is the 3000000 ms AkashML's own guide recommends, which is 50 minutes. That is deliberately generous for long agent turns, and the tradeoff is that a genuinely stuck request takes 50 minutes to give up rather than failing fast. Lower it if you would rather find out sooner.
+`apiTimeoutMs` raises the per-request deadline. Open models behind a gateway can be far slower than Claude is: with Claude Code's full system prompt and tool definitions in the request, GLM-5.3 has taken several minutes to answer a one-word prompt, though that is mostly GLM looping rather than the gateway being slow. The default here is the 3000000 ms AkashML's own guide recommends, which is 50 minutes. That is deliberately generous for long agent turns, and the tradeoff is that a genuinely stuck request takes 50 minutes to give up rather than failing fast. Lower it if you would rather find out sooner.
 
 `tokenPrefix` is what that provider's keys begin with. `cx` checks it when you store a key and again before launching, so a mistyped credential fails at the prompt with a readable message instead of reaching you as a 401 from the gateway.
 
