@@ -52,8 +52,8 @@ func DefaultConfig() Config {
 				BehavesAs:       "claude-sonnet-5",
 				APITimeoutMS:    3000000,
 				Models: Models{
-					Opus:      "openai--gpt-oss-120b",
-					Sonnet:    "openai--gpt-oss-120b",
+					Opus:      "zai-org--GLM-5.3",
+					Sonnet:    "zai-org--GLM-5.3",
 					Haiku:     "openai--gpt-oss-20b",
 					SmallFast: "openai--gpt-oss-20b",
 				},
@@ -144,4 +144,10 @@ func (c Config) ProviderNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// Save writes the configuration back, so that cx can edit it in place instead
+// of asking a person to hand-edit JSON.
+func Save(path string, cfg Config) error {
+	return writeConfig(path, cfg)
 }

@@ -52,6 +52,8 @@ func run(argv []string) error {
 		return printStatus(cfg, provider, path)
 	case cx.CommandToken:
 		return runToken(cfg, provider, inv.CommandArgs)
+	case cx.CommandModels:
+		return runModels(cfg, provider, path, inv.CommandArgs)
 	}
 	return launch(cfg, provider, inv.ClaudeArgs)
 }

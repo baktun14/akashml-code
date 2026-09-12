@@ -52,8 +52,8 @@ claude    /Users/you/.local/bin/claude
 gateway       akashml
   base url    https://api.akashml.com/anthropic
   token       present (macOS keychain, service "akashml")
-  opus        openai--gpt-oss-120b
-  sonnet      openai--gpt-oss-120b
+  opus        zai-org--GLM-5.3
+  sonnet      zai-org--GLM-5.3
   haiku       openai--gpt-oss-20b
   small/fast  openai--gpt-oss-20b
 ```
@@ -85,8 +85,8 @@ Since `cx` replaces itself with `claude` rather than wrapping it, exit codes, si
       "baseUrl": "https://api.akashml.com/anthropic",
       "keychainService": "akashml",
       "models": {
-        "opus": "openai--gpt-oss-120b",
-        "sonnet": "openai--gpt-oss-120b",
+        "opus": "zai-org--GLM-5.3",
+        "sonnet": "zai-org--GLM-5.3",
         "haiku": "openai--gpt-oss-20b",
         "smallFast": "openai--gpt-oss-20b"
       },
@@ -103,24 +103,26 @@ Model ids use `--` between the org and the model, not `/`. Ask the endpoint for 
 curl -s https://api.akashml.com/anthropic/v1/models | python3 -m json.tool
 ```
 
-Trust that list over any documentation, including AkashML's own guide, which currently advertises at least one model the endpoint answers with a 404. The gateway accepts both the `zai-org--GLM-5.3` spelling the endpoint returns and the `zai-org/GLM-5.3` spelling the docs use.
+`cx --akash models` reads the same list, which is the easier way in. Trust it over any documentation, including AkashML's own guide, which currently advertises at least one model the endpoint answers with a 404. The gateway accepts both the `zai-org--GLM-5.3` spelling the endpoint returns and the `zai-org/GLM-5.3` spelling the docs use.
 
-### A note on GLM-5.3
+### Switching models
 
-Avoid it here for now, which is why it is not the default. AkashML's Anthropic endpoint returns GLM's raw output without parsing its reasoning delimiters, so a literal `</think>` and the whole chain of thought land in the visible answer. GLM also tends to run away with itself afterwards, repeating "Done. Final. Complete." for minutes on end, which is where the long response times come from. The gateway clearly knows how to separate the reasoning, because two other paths do it correctly: its OpenAI endpoint returns a clean `content` alongside a separate `reasoning_content` with no special request, and its Anthropic endpoint returns proper `thinking` and `text` blocks when a request explicitly enables thinking. It only leaks on the Anthropic endpoint when the client does not ask for thinking, which is the default case.
+You do not have to hand-edit the config to change models. `cx` asks the gateway what it serves and writes your choice back:
 
-That leaves no workaround worth using. Turning thinking off does not help (`thinking: {"type": "disabled"}`, `chat_template_kwargs.enable_thinking: false` and a `/nothink` system prompt all still leak), and turning it on via `MAX_THINKING_TOKENS` only works for trivial requests: give GLM Claude Code's real system prompt and tool definitions and it leaks its reasoning again, this time along with tool-call scaffolding such as `</arg_value>` in the visible answer.
+```
+$ cx --akash models
+1  openai--gpt-oss-20b                 GPT OSS 20B             haiku, smallFast
+2  Qwen--Qwen3.8-27B                   Qwen3.8 27B
+3  meta-llama--Llama-3.3-70B-Instruct  Llama 3.3 70B Instruct
+4  Qwen--Qwen3.6-35B-A3B               Qwen3.6 35B A3B
+5  openai--gpt-oss-120b                GPT OSS 120B
+6  zai-org--GLM-5.3                    GLM-5.3                 opus, sonnet
 
-Every other model AkashML serves is clean. All five return plain text and emit correct tool calls with `stop_reason: tool_use`, which is what Claude Code needs:
+$ cx --akash models use 5            # point every tier at GPT OSS 120B
+$ cx --akash models use 1 haiku fast # or just the cheap tiers
+```
 
-| Model | Reasoning leak | Tool calls |
-|---|---|---|
-| `openai--gpt-oss-120b` | clean | yes |
-| `openai--gpt-oss-20b` | clean | yes |
-| `meta-llama--Llama-3.3-70B-Instruct` | clean | yes |
-| `Qwen--Qwen3.8-27B` | clean | yes |
-| `Qwen--Qwen3.6-35B-A3B` | clean | yes |
-| `zai-org--GLM-5.3` | **leaks `</think>`** | yes |
+Take a number from the listing or paste an id. The last column shows which tiers each model currently backs. Since the list comes from the provider's own `/v1/models`, the ids offered are always ones it will accept.
 
 `smallFast` is worth setting separately. Claude Code uses that tier for frequent background work, so a cheaper model there, `openai--gpt-oss-20b` for instance, is rarely something you notice.
 
@@ -128,7 +130,7 @@ Set `"defaultProvider": "akashml"` if you would rather have a bare `cx` go to Ak
 
 `behavesAs` names the Claude model whose capabilities Claude Code should assume for this provider's models, and it is not optional in practice. Claude Code refuses any model id missing from the catalog its own build shipped with, so without it a launch dies on `[claude-code:unrecognized_model]` before a single request goes out. `cx` passes it per launch via `claude --settings`, so a gateway's models never show up in the picker of a session running on Anthropic.
 
-`apiTimeoutMs` raises the per-request deadline. Open models behind a gateway can be far slower than Claude is: with Claude Code's full system prompt and tool definitions in the request, GLM-5.3 has taken several minutes to answer a one-word prompt, though that is mostly GLM looping rather than the gateway being slow. The default here is the 3000000 ms AkashML's own guide recommends, which is 50 minutes. That is deliberately generous for long agent turns, and the tradeoff is that a genuinely stuck request takes 50 minutes to give up rather than failing fast. Lower it if you would rather find out sooner.
+`apiTimeoutMs` raises the per-request deadline. Open models behind a gateway can be far slower than Claude is: a model can take far longer to answer once Claude Code's full system prompt and tool definitions are in the request. The default here is the 3000000 ms AkashML's own guide recommends, which is 50 minutes. That is deliberately generous for long agent turns, and the tradeoff is that a genuinely stuck request takes 50 minutes to give up rather than failing fast. Lower it if you would rather find out sooner.
 
 `tokenPrefix` is what that provider's keys begin with. `cx` checks it when you store a key and again before launching, so a mistyped credential fails at the prompt with a readable message instead of reaching you as a 401 from the gateway.
 

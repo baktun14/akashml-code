@@ -19,6 +19,8 @@ provider flags:
 
 commands:
   status                 show the resolved provider, models and token state
+  models                 list the models the gateway serves
+  models use N [tier]    point every tier, or one tier, at that model
   token set              read a token from the terminal and store it securely
   help, version
 

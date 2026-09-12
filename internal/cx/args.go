@@ -6,6 +6,7 @@ const (
 	CommandLaunch  = ""
 	CommandStatus  = "status"
 	CommandToken   = "token"
+	CommandModels  = "models"
 	CommandHelp    = "help"
 	CommandVersion = "version"
 )
@@ -74,6 +75,8 @@ func commandFor(arg string) (string, bool) {
 		return CommandStatus, true
 	case "token":
 		return CommandToken, true
+	case "models", "model":
+		return CommandModels, true
 	case "help", "--help", "-h":
 		return CommandHelp, true
 	case "version", "--version":
