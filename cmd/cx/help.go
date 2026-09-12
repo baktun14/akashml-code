@@ -21,6 +21,7 @@ commands:
   status                 show the resolved provider, models and token state
   models                 list the models the gateway serves
   models use N [tier]    point every tier, or one tier, at that model
+  models probe           find out which models accept an image
   token set              read a token from the terminal and store it securely
   help, version
 

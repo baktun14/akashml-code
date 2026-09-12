@@ -6,6 +6,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"text/tabwriter"
 
 	"github.com/baktun14/akashml-code/internal/cx"
@@ -31,26 +32,93 @@ func runModels(cfg cx.Config, provider, configPath string, args []string) error 
 		return err
 	}
 
-	if len(args) == 0 {
-		return listModels(models, p)
+	switch {
+	case len(args) == 0:
+		return listModels(models, provider, p)
+	case args[0] == "use":
+		return useModel(cfg, provider, configPath, models, args[1:])
+	case args[0] == "probe":
+		return probeModels(models, provider, p, token)
 	}
-	if args[0] != "use" {
-		return fmt.Errorf("unknown models command %q, try: cx --%s models use <number|id> [tier...]", args[0], provider)
-	}
-	return useModel(cfg, provider, configPath, models, args[1:])
+	return fmt.Errorf("unknown models command %q, try: use or probe", args[0])
 }
 
-func listModels(models []cx.Model, p cx.Provider) error {
+func listModels(models []cx.Model, provider string, p cx.Provider) error {
+	caps := loadCapabilities()
+
 	out := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	probed := false
 	for i, m := range models {
-		fmt.Fprintf(out, "%d\t%s\t%s\t%s\n", i+1, m.ID, m.Name(), strings.Join(p.Models.TiersUsing(m.ID), ", "))
+		vision := caps.VisionFor(provider, m.ID)
+		probed = probed || vision != cx.VisionUnknown
+		fmt.Fprintf(out, "%d\t%s\t%s\t%s\t%s\n",
+			i+1, m.ID, m.Name(), strings.Join(p.Models.TiersUsing(m.ID), ", "), vision.Describe())
 	}
 	if err := out.Flush(); err != nil {
 		return err
 	}
-	fmt.Println("\nuse one everywhere:  cx --akash models use <number>")
-	fmt.Println("or for one tier:     cx --akash models use <number> haiku")
+
+	fmt.Printf("\nuse one everywhere:  cx --%s models use <number>\n", provider)
+	fmt.Printf("or for one tier:     cx --%s models use <number> haiku\n", provider)
+	if !probed {
+		fmt.Printf("which take images:   cx --%s models probe\n", provider)
+	}
 	return nil
+}
+
+// probeModels sends each model an image and records what it does with it, since
+// the model list says nothing about capabilities and the failure mode for
+// getting this wrong is a session that cannot continue.
+func probeModels(models []cx.Model, provider string, p cx.Provider, token string) error {
+	fmt.Fprintf(os.Stderr, "sending each of the %d models one small image...\n", len(models))
+
+	found := make([]cx.VisionSupport, len(models))
+	errs := make([]error, len(models))
+
+	var wg sync.WaitGroup
+	limit := make(chan struct{}, 4)
+	for i, m := range models {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			limit <- struct{}{}
+			defer func() { <-limit }()
+			found[i], errs[i] = cx.ProbeVision(p, token, m.ID)
+		}()
+	}
+	wg.Wait()
+
+	caps := loadCapabilities()
+	out := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	for i, m := range models {
+		if errs[i] != nil {
+			fmt.Fprintf(out, "%s\t%s\n", m.ID, "could not tell: "+errs[i].Error())
+			continue
+		}
+		caps.SetVision(provider, m.ID, found[i])
+		fmt.Fprintf(out, "%s\t%s\n", m.ID, found[i].Describe())
+	}
+	if err := out.Flush(); err != nil {
+		return err
+	}
+
+	path, err := cx.CapabilitiesPath()
+	if err != nil {
+		return err
+	}
+	if err := cx.SaveCapabilities(path, caps); err != nil {
+		return err
+	}
+	fmt.Println("\nA model that drops images gives no error, it just answers as if the image were not there.")
+	return nil
+}
+
+func loadCapabilities() cx.Capabilities {
+	path, err := cx.CapabilitiesPath()
+	if err != nil {
+		return cx.Capabilities{}
+	}
+	return cx.LoadCapabilities(path)
 }
 
 func useModel(cfg cx.Config, provider, configPath string, models []cx.Model, args []string) error {
@@ -83,6 +151,12 @@ func useModel(cfg cx.Config, provider, configPath string, models []cx.Model, arg
 
 	if err := cx.Save(configPath, cfg); err != nil {
 		return err
+	}
+
+	if vision := loadCapabilities().VisionFor(provider, chosen.ID); vision == cx.VisionRejects {
+		fmt.Fprintf(os.Stderr,
+			"warning: %s rejects images. Pasting one into a session on it fails every turn afterwards,\n"+
+				"         including the message asking it to ignore the image.\n", chosen.ID)
 	}
 
 	fmt.Printf("%s now backs %s\n", chosen.ID, strings.Join(tiers, ", "))

@@ -126,14 +126,21 @@ $ cx --akash models use 1 haiku fast # or just the cheap tiers
 
 Pasting an image into a session is worth thinking about before you do it, because not every model takes one and the failure is unrecoverable in place. An image stays in the conversation, so every later turn resends it. Once a text-only model has rejected one, every following message fails the same way no matter what you type, including a message asking it to ignore the image.
 
-| Model | Image in the request |
-|---|---|
-| `Qwen--Qwen3.8-27B` | reads it |
-| `Qwen--Qwen3.6-35B-A3B` | reads it |
-| `openai--gpt-oss-120b` | accepted, then ignored (empty reply) |
-| `openai--gpt-oss-20b` | accepted, then ignored (empty reply) |
-| `zai-org--GLM-5.3` | **400, and the session cannot continue** |
-| `meta-llama--Llama-3.3-70B-Instruct` | **400, and the session cannot continue** |
+Ask which models can take one. The model list says nothing about capabilities, so `cx` finds out the only honest way there is, by sending each model a small red square and seeing what comes back:
+
+```
+$ cx --akash models probe
+openai--gpt-oss-20b                 drops images
+Qwen--Qwen3.8-27B                   reads images
+meta-llama--Llama-3.3-70B-Instruct  REJECTS images
+Qwen--Qwen3.6-35B-A3B               reads images
+openai--gpt-oss-120b                drops images
+zai-org--GLM-5.3                    REJECTS images
+```
+
+It takes a few seconds and the answers are cached, so `cx --akash models` carries the column from then on, and picking a model that rejects images warns you.
+
+The middle category is the one to watch. A model that drops images raises no error and answers as though the picture were never there.
 
 If you are already stuck, you do not have to abandon the conversation. Switch to a model that accepts images and resume:
 
