@@ -89,7 +89,9 @@ Since `cx` replaces itself with `claude` rather than wrapping it, exit codes, si
         "sonnet": "zai-org--GLM-5.3",
         "haiku": "zai-org--GLM-5.3",
         "smallFast": "zai-org--GLM-5.3"
-      }
+      },
+      "behavesAs": "claude-sonnet-5",
+      "apiTimeoutMs": 3000000
     }
   }
 }
@@ -101,9 +103,15 @@ Model ids use `--` between the org and the model, not `/`. Ask the endpoint for 
 curl -s https://api.akashml.com/anthropic/v1/models | python3 -m json.tool
 ```
 
+Trust that list over any documentation, including AkashML's own guide, which currently advertises at least one model the endpoint answers with a 404. The gateway accepts both the `zai-org--GLM-5.3` spelling the endpoint returns and the `zai-org/GLM-5.3` spelling the docs use.
+
 `smallFast` is worth setting separately. Claude Code uses that tier for frequent background work, so a cheaper model there, `openai--gpt-oss-20b` for instance, is rarely something you notice.
 
 Set `"defaultProvider": "akashml"` if you would rather have a bare `cx` go to AkashML and keep `cx --anthropic` for the times you want your subscription.
+
+`behavesAs` names the Claude model whose capabilities Claude Code should assume for this provider's models, and it is not optional in practice. Claude Code refuses any model id missing from the catalog its own build shipped with, so without it a launch dies on `[claude-code:unrecognized_model]` before a single request goes out. `cx` passes it per launch via `claude --settings`, so a gateway's models never show up in the picker of a session running on Anthropic.
+
+`apiTimeoutMs` raises the per-request deadline. Open models behind a gateway can be far slower than Claude is: with Claude Code's full system prompt and tool definitions in the request, GLM-5.3 has taken several minutes to answer a one-word prompt. The default here is the 3000000 ms AkashML's own guide recommends, which is 50 minutes. That is deliberately generous for long agent turns, and the tradeoff is that a genuinely stuck request takes 50 minutes to give up rather than failing fast. Lower it if you would rather find out sooner.
 
 `tokenPrefix` is what that provider's keys begin with. `cx` checks it when you store a key and again before launching, so a mistyped credential fails at the prompt with a readable message instead of reaching you as a 401 from the gateway.
 
@@ -115,7 +123,7 @@ On the Anthropic path, `cx` clears the variables a gateway session would have se
 
 On a gateway path, it clears the same set and then exports the base URL, your token as `ANTHROPIC_AUTH_TOKEN`, all four model tiers, and two flags. `CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1` keeps Claude Code from sending pre-release features a third-party endpoint won't implement. `CLAUDE_CODE_DISABLE_1M_CONTEXT=1` matters more than it looks: if your saved model selection is a 1M-context variant, Claude Code carries that choice into the gateway session and asks for `<model>[1m]`, an id no gateway serves, and you get `unrecognized_model` before a single request goes out. It also clears `CLAUDE_CODE_USE_BEDROCK` and friends, because those outrank the auth token in [Claude Code's precedence order](https://code.claude.com/docs/en/authentication#authentication-precedence) and would route you somewhere you didn't ask for.
 
-One thing to avoid: don't put `ANTHROPIC_*` variables in the `env` block of `~/.claude/settings.json`. Values there override the environment a process is launched with, which would pin every session to one provider and defeat the tool.
+One thing to avoid: don't put `ANTHROPIC_*` variables in the `env` block of `~/.claude/settings.json`. Values there override the environment a process is launched with, which would pin every session to one provider and defeat the tool. AkashML's own Claude Code guide tells you to do exactly that, which is fine if the gateway is all you ever use and is the thing `cx` exists to replace.
 
 ## Caveats
 

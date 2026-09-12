@@ -1,6 +1,7 @@
 package cx
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 )
@@ -141,5 +142,69 @@ func TestBuildEnvOnAnthropicLeavesTheLongContextVariantAlone(t *testing.T) {
 
 	if _, ok := got["CLAUDE_CODE_DISABLE_1M_CONTEXT"]; ok {
 		t.Error("CLAUDE_CODE_DISABLE_1M_CONTEXT was set on the Anthropic path, where 1M context is wanted")
+	}
+}
+
+func TestModelPickerSettingsDescribesEveryConfiguredModelOnce(t *testing.T) {
+	p := testProvider()
+	p.BehavesAs = "claude-sonnet-5"
+	p.Models.Haiku = p.Models.Sonnet
+
+	settings, err := ModelPickerSettings(ProviderAkashML, p)
+	if err != nil {
+		t.Fatalf("ModelPickerSettings returned %v", err)
+	}
+
+	var decoded struct {
+		ModelPicker struct {
+			Options []struct {
+				Model     string `json:"model"`
+				BehavesAs string `json:"behavesAs"`
+			} `json:"options"`
+		} `json:"modelPicker"`
+	}
+	if err := json.Unmarshal([]byte(settings), &decoded); err != nil {
+		t.Fatalf("the payload is not the shape claude --settings accepts: %v", err)
+	}
+
+	seen := map[string]int{}
+	for _, row := range decoded.ModelPicker.Options {
+		seen[row.Model]++
+		if row.BehavesAs != "claude-sonnet-5" {
+			t.Errorf("row %q has behavesAs %q; without it Claude Code refuses the model", row.Model, row.BehavesAs)
+		}
+	}
+	for model, count := range seen {
+		if count > 1 {
+			t.Errorf("%s is listed %d times, so the picker would show duplicates", model, count)
+		}
+	}
+	if len(seen) != 3 {
+		t.Errorf("described %d distinct models, want 3 (opus, sonnet shared with haiku, smallFast)", len(seen))
+	}
+}
+
+func TestModelPickerSettingsIsEmptyWithoutABehavesAsMapping(t *testing.T) {
+	p := testProvider()
+	p.BehavesAs = ""
+
+	settings, err := ModelPickerSettings(ProviderAkashML, p)
+
+	if err != nil {
+		t.Fatalf("ModelPickerSettings returned %v", err)
+	}
+	if settings != "" {
+		t.Errorf("got %q, want nothing: a picker row with no behavesAs is what Claude Code rejects", settings)
+	}
+}
+
+func TestBuildEnvOnGatewaySetsTheRequestDeadline(t *testing.T) {
+	p := testProvider()
+	p.APITimeoutMS = 3000000
+
+	got := envMap(BuildEnv(nil, ProviderAkashML, p, "secret-token"))
+
+	if got["API_TIMEOUT_MS"] != "3000000" {
+		t.Errorf("API_TIMEOUT_MS = %q, want the configured deadline: open models are slow to first token", got["API_TIMEOUT_MS"])
 	}
 }

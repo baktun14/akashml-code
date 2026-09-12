@@ -26,7 +26,14 @@ type Provider struct {
 	// TokenPrefix, when set, is what this provider's keys start with. cx checks
 	// it so that a mistyped credential fails at the prompt rather than as a 401.
 	TokenPrefix string `json:"tokenPrefix"`
-	Models      Models `json:"models"`
+	// BehavesAs names the Claude model whose capabilities Claude Code should
+	// assume for this provider's models. Without it, Claude Code refuses an id
+	// that is absent from its own catalog.
+	BehavesAs string `json:"behavesAs"`
+	// APITimeoutMS raises the per-request deadline, since open models served
+	// behind a gateway are often much slower to first token than Claude is.
+	APITimeoutMS int    `json:"apiTimeoutMs"`
+	Models       Models `json:"models"`
 }
 
 type Config struct {
@@ -42,6 +49,8 @@ func DefaultConfig() Config {
 				BaseURL:         "https://api.akashml.com/anthropic",
 				KeychainService: ProviderAkashML,
 				TokenPrefix:     "akml-",
+				BehavesAs:       "claude-sonnet-5",
+				APITimeoutMS:    3000000,
 				Models: Models{
 					Opus:      "zai-org--GLM-5.3",
 					Sonnet:    "zai-org--GLM-5.3",
@@ -94,6 +103,12 @@ func mergeProvider(base, over Provider) Provider {
 	}
 	if over.TokenPrefix != "" {
 		base.TokenPrefix = over.TokenPrefix
+	}
+	if over.BehavesAs != "" {
+		base.BehavesAs = over.BehavesAs
+	}
+	if over.APITimeoutMS != 0 {
+		base.APITimeoutMS = over.APITimeoutMS
 	}
 	if over.Models.Opus != "" {
 		base.Models.Opus = over.Models.Opus

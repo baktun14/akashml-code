@@ -1,8 +1,10 @@
 package cx
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -19,6 +21,7 @@ var managedVars = []string{
 	"ANTHROPIC_DEFAULT_SONNET_MODEL",
 	"ANTHROPIC_DEFAULT_HAIKU_MODEL",
 	"ANTHROPIC_SMALL_FAST_MODEL",
+	"API_TIMEOUT_MS",
 	"CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS",
 	"CLAUDE_CODE_DISABLE_1M_CONTEXT",
 	"CX_PROVIDER",
@@ -56,7 +59,7 @@ func BuildEnv(base []string, name string, p Provider, token string) []string {
 }
 
 func gatewayVars(p Provider, token string) map[string]string {
-	return map[string]string{
+	vars := map[string]string{
 		"ANTHROPIC_BASE_URL":                     p.BaseURL,
 		"ANTHROPIC_AUTH_TOKEN":                   token,
 		"ANTHROPIC_DEFAULT_OPUS_MODEL":           p.Models.Opus,
@@ -68,6 +71,60 @@ func gatewayVars(p Provider, token string) map[string]string {
 		// makes Claude Code ask for "<model>[1m]", which no gateway model id is.
 		"CLAUDE_CODE_DISABLE_1M_CONTEXT": "1",
 	}
+	if p.APITimeoutMS > 0 {
+		vars["API_TIMEOUT_MS"] = strconv.Itoa(p.APITimeoutMS)
+	}
+	return vars
+}
+
+type modelPickerRow struct {
+	Model     string `json:"model"`
+	Label     string `json:"label,omitempty"`
+	BehavesAs string `json:"behavesAs"`
+}
+
+// ModelPickerSettings describes this provider's models to Claude Code, which
+// otherwise refuses any id missing from the catalog its own build shipped with.
+// It is passed per launch via --settings so that a gateway's models never enter
+// the picker of a session running on Anthropic.
+func ModelPickerSettings(name string, p Provider) (string, error) {
+	if p.BehavesAs == "" {
+		return "", nil
+	}
+
+	rows := make([]modelPickerRow, 0, 4)
+	for _, model := range p.Models.distinct() {
+		rows = append(rows, modelPickerRow{
+			Model:     model,
+			Label:     fmt.Sprintf("%s (%s)", model, name),
+			BehavesAs: p.BehavesAs,
+		})
+	}
+	if len(rows) == 0 {
+		return "", nil
+	}
+
+	payload, err := json.Marshal(map[string]any{
+		"modelPicker": map[string]any{"options": rows},
+	})
+	if err != nil {
+		return "", err
+	}
+	return string(payload), nil
+}
+
+// distinct lists the configured model ids once each, in tier order.
+func (m Models) distinct() []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, model := range []string{m.Opus, m.Sonnet, m.Haiku, m.SmallFast} {
+		if model == "" || seen[model] {
+			continue
+		}
+		seen[model] = true
+		out = append(out, model)
+	}
+	return out
 }
 
 func strip(env []string, names []string) []string {

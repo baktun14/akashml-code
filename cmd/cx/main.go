@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime/debug"
+	"slices"
 	"syscall"
 	"text/tabwriter"
 
@@ -71,8 +72,33 @@ func launch(cfg cx.Config, provider string, args []string) error {
 		return fmt.Errorf("cannot find the claude binary: %w", err)
 	}
 
+	args, err = withModelPicker(provider, p, args)
+	if err != nil {
+		return err
+	}
+
 	env := cx.BuildEnv(os.Environ(), provider, p, token)
 	return syscall.Exec(bin, append([]string{bin}, args...), env)
+}
+
+// withModelPicker prepends the settings that describe a gateway's models, which
+// Claude Code needs before it will accept an id its own catalog does not carry.
+// A --settings of the caller's own is left alone rather than silently replaced.
+func withModelPicker(provider string, p cx.Provider, args []string) ([]string, error) {
+	if provider == cx.ProviderAnthropic {
+		return args, nil
+	}
+
+	settings, err := cx.ModelPickerSettings(provider, p)
+	if err != nil || settings == "" {
+		return args, err
+	}
+
+	if slices.Contains(args, "--settings") {
+		fmt.Fprintln(os.Stderr, "cx: --settings given, so the model picker rows for "+provider+" were not added")
+		return args, nil
+	}
+	return append([]string{"--settings", settings}, args...), nil
 }
 
 func tokenFor(provider string, p cx.Provider) (string, error) {
